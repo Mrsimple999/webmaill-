@@ -108,7 +108,6 @@
       background-color: #f9c851;
       color: black;
     }
-    /* 🔗 Style cho tiêu đề có liên kết */
     h3 {
       text-align: center;
       line-height: 1.4;
@@ -127,7 +126,6 @@
 <body>
 <div id="customToast"></div>
 
-<!-- 🔗 Tiêu đề có liên kết -->
 <h3>
   📨 <a href="https://mrsimple999.github.io/coppymail/" target="_blank" rel="noopener noreferrer">
     Quản lý danh sách ACCMY
@@ -165,7 +163,6 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const emailRef = db.ref('emails');
 const lastCopiedRef = db.ref('lastCopied');
-const copyLogsRef = db.ref('copyLogs');
 
 let emailList = [];
 let isDuplicateToast = false;
@@ -194,30 +191,15 @@ function updateCount() {
   document.getElementById('count').textContent = `📊 Số email còn lại: ${emailList.length}`;
 }
 
-function showToast(msg, isError = false, isSuccess = false, isWarning = false, duration = 6000, persistent = false) {
+function showToast(msg, isError = false, isSuccess = false, isWarning = false, duration = 6000) {
   const toast = document.getElementById('customToast');
   toast.textContent = msg;
   toast.className = '';
   toast.classList.add('show');
-
   if (isError) toast.classList.add('error');
   else if (isSuccess) toast.classList.add('success');
   else if (isWarning) toast.classList.add('warning');
-
-  if (persistent) {
-    isDuplicateToast = true;
-    return;
-  }
-
-  setTimeout(() => {
-    if (!isDuplicateToast) toast.classList.remove('show');
-  }, duration);
-}
-
-function hideToast() {
-  const toast = document.getElementById('customToast');
-  toast.classList.remove('show');
-  isDuplicateToast = false;
+  setTimeout(() => toast.classList.remove('show'), duration);
 }
 
 function copyText(text) {
@@ -237,8 +219,8 @@ function fallbackCopy(text) {
   textarea.focus();
   textarea.select();
   try {
-    const successful = document.execCommand('copy');
-    showToast(successful ? `✅ Đã copy: ${text}` : '⚠️ Không thể copy.', !successful, successful);
+    document.execCommand('copy');
+    showToast(`✅ Đã copy: ${text}`, false, true);
   } catch {
     showToast('⚠️ Lỗi khi copy.', true);
   }
@@ -251,6 +233,7 @@ emailRef.on('value', snapshot => {
   updateCount();
 });
 
+// ➕ Thêm danh sách email
 document.getElementById('addListButton').addEventListener('click', () => {
   const input = document.getElementById('emailListInput').value.trim();
   const filteredEmails = extractEmails(input);
@@ -268,10 +251,9 @@ document.getElementById('addListButton').addEventListener('click', () => {
     if (error || !committed) {
       showToast('⚠️ Không thể thêm email.', true);
     } else {
-      const updatedList = snapshot.val() ? snapshot.val() : [];
       showToast(`✅ Đã thêm ${filteredEmails.length} email hợp lệ.`, false, true);
       document.getElementById('emailListInput').value = '';
-      emailList = updatedList;
+      emailList = snapshot.val() || [];
       updateCount();
     }
   });
@@ -299,6 +281,7 @@ document.getElementById('deleteListButton').addEventListener('click', () => {
   });
 });
 
+// 📋 Copy thủ công
 document.getElementById('manualCopyButton').addEventListener('click', () => {
   const email = document.getElementById('emailOutput').value;
   if (!email) {
@@ -308,53 +291,50 @@ document.getElementById('manualCopyButton').addEventListener('click', () => {
   copyText(email);
 });
 
+// 🔁 Đổi accmy khác (lấy email kế tiếp)
 document.getElementById('changeEmailButton').addEventListener('click', () => {
   if (emailList.length === 0) {
     showToast('⚠️ Danh sách email trống.', true);
     return;
   }
-  const randomIndex = Math.floor(Math.random() * emailList.length);
-  const email = emailList[randomIndex];
-  document.getElementById('emailOutput').value = email;
-  copyText(email);
-  showToast(`🔁 Đã đổi sang email khác: ${email}`, false, true);
+  const currentEmail = document.getElementById('emailOutput').value.trim();
+  let newEmail;
+  if (!currentEmail) newEmail = emailList[0];
+  else {
+    const idx = emailList.indexOf(currentEmail);
+    newEmail = emailList[(idx + 1) % emailList.length];
+  }
+  document.getElementById('emailOutput').value = newEmail;
+  copyText(newEmail);
+  showToast(`🔁 Đã đổi sang email khác: ${newEmail}`, false, true);
 });
 
+// 📋 Lấy & Copy accmy (1 email duy nhất)
 document.getElementById('copyButton').addEventListener('click', () => {
-  document.body.classList.remove('duplicate-mode');
-  hideToast();
+  const output = document.getElementById('emailOutput');
   const copyButton = document.getElementById('copyButton');
   copyButton.disabled = true;
   copyButton.textContent = "⏳ Đang xử lý...";
 
   if (emailList.length === 0) {
-    showToast('⚠️ Danh sách đã hết email.', true);
+    showToast('⚠️ Danh sách email trống.', true);
     copyButton.disabled = false;
-    copyButton.textContent = "📋 Lấy & Copy Email";
+    copyButton.textContent = "📋 Lấy & Copy accmy";
     return;
   }
 
-  const randomIndex = Math.floor(Math.random() * emailList.length);
-  const email = emailList[randomIndex];
-  copyText(email);
+  let currentEmail = output.value.trim();
+  if (!currentEmail) {
+    currentEmail = emailList[0];
+    output.value = currentEmail;
+  }
 
-  emailRef.transaction(currentList => {
-    if (!currentList) return null;
-    const idx = currentList.indexOf(email);
-    if (idx !== -1) currentList.splice(idx, 1);
-    return currentList;
-  }, (error, committed, snapshot) => {
-    if (error) {
-      showToast('⚠️ Lỗi khi xóa email.', true);
-    } else if (committed) {
-      document.getElementById('emailOutput').value = email;
-      emailList = snapshot.val() || [];
-      updateCount();
-      lastCopiedRef.set({ email, time: Date.now(), deviceId });
-    }
-    copyButton.disabled = false;
-    copyButton.textContent = "📋 Lấy & Copy Email";
-  });
+  copyText(currentEmail);
+  showToast(`✅ Đã copy: ${currentEmail}`, false, true);
+  lastCopiedRef.set({ email: currentEmail, time: Date.now(), deviceId });
+
+  copyButton.disabled = false;
+  copyButton.textContent = "📋 Lấy & Copy accmy";
 });
 </script>
 </body>
