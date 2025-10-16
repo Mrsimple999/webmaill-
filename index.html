@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>ACC Mỹ & Email</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  <style>
+    :root {
+      --main-blue: #007bff;
+      --main-green: #28a745;
+      --main-red: #dc3545;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f0f2f5;
+      margin: 0 auto;
+      padding: 10px;
+      max-width: 430px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 10px;
+      box-sizing: border-box;
+    }
+
+    section {
+      background: white;
+      padding: 10px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    textarea, input {
+      font-size: 15px;
+      width: 100%;
+      padding: 8px;
+      margin-top: 6px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+
+    /* Nút chính lấy ACC */
+    #accCopyBtnTop {
+      font-size: 18px;
+      padding: 14px;
+      background: var(--main-green);
+      color: white;
+      border: none;
+      width: 100%;
+      border-radius: 10px;
+      margin-bottom: 8px;
+    }
+
+    /* Nhóm nút ngang */
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-top: 6px;
+      width: 100%;
+    }
+    .btn-group button {
+      flex: 1;
+      padding: 12px;
+      font-size: 14px;
+      border-radius: 8px;
+    }
+
+    button {
+      background: var(--main-blue);
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-red { background: var(--main-red); }
+
+    .input-container {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+      width: 100%;
+    }
+    .input-container input {
+      flex: 1;
+      padding: 8px;
+    }
+    .input-container button {
+      flex: 0 0 44px;
+      font-size: 18px;
+      padding: 0;
+    }
+
+    p {
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    #accInput, #emailInput {
+      height: 55px;
+      font-size: 14px;
+    }
+
+    html, body { overflow: hidden; }
+
+    #customToast {
+      position: fixed;
+      top: -100px;
+      left: 0;
+      width: 100%;
+      background-color: #343a40;
+      color: white;
+      text-align: center;
+      padding: 14px 10px;
+      font-size: 16px;
+      font-weight: bold;
+      z-index: 9999;
+      transition: top 0.5s ease-in-out;
+    }
+    #customToast.show { top: 0; }
+    #customToast.error { background-color: #d93025; }
+    #customToast.success { background-color: #28a745; }
+
+    /* ✅ Nút lấy & copy email giữ nguyên kích thước cũ */
+    #emailCopyBtn {
+      font-size: 18px;
+      padding: 14px;
+      background: var(--main-green);
+      color: white;
+      border: none;
+      width: 100%;
+      border-radius: 10px;
+      margin-top: 8px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ✅ Số lượng email nằm bên phải trong nút */
+    #emailCopyBtn span {
+      font-size: 14px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<div id="customToast"></div>
+
+<!-- ✅ Nút lấy ACC Mỹ -->
+<button id="accCopyBtnTop">📋 Lấy ACC Mỹ</button>
+
+<!-- ================= ACC MỸ ================= -->
+<section>
+  <textarea id="accInput" placeholder="Dán ACC Mỹ (ngăn cách bằng xuống dòng hoặc , ; :)"></textarea>
+  <div class="btn-group">
+    <button id="accAddBtn">➕ Thêm ACC</button>
+    <button id="accDeleteCurrentBtnTop" class="btn-red" title="Xóa ACC hiện tại">🗑️ Xóa ACC</button>
+  </div>
+  <div class="input-container">
+    <input type="text" id="accOutput" placeholder="ACC Mỹ hiển thị..." readonly>
+    <button id="accCopyManual" title="Copy ACC">📋</button>
+  </div>
+  <p id="accCount"></p>
+</section>
+
+<!-- ================= EMAIL ================= -->
+<section>
+  <textarea id="emailInput" placeholder="Dán email..."></textarea>
+  <div class="btn-group">
+    <button id="emailAddBtn">➕ Thêm Email</button>
+    <button id="emailDeleteAllBtn" class="btn-red" title="Xóa toàn bộ email">🗑️ Xóa Email</button>
+  </div>
+  <div class="input-container">
+    <input type="text" id="emailOutput" placeholder="Email hiển thị..." readonly>
+    <button id="emailCopyManual" title="Copy Email">📋</button>
+  </div>
+  <!-- ✅ Nút lấy & copy nằm ngay dưới ô hiển thị email -->
+  <button id="emailCopyBtn">📋 Lấy & Copy Email <span id="emailCount"></span></button>
+</section>
+
+<script>
+  // ================== FIREBASE ==================
+  const firebaseConfig = {
+    apiKey: "AIzaSyB9elXt44pt-DGYygIOWQog8XE-YqQO_I8",
+    authDomain: "email-sync-tool.firebaseapp.com",
+    databaseURL: "https://email-sync-tool-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "email-sync-tool",
+    storageBucket: "email-sync-tool.appspot.com",
+    messagingSenderId: "902586987378",
+    appId: "1:902586987378:web:b151f5d50773490816e3eb"
+  };
+  firebase.initializeApp(firebaseConfig);
+
+  // ================== TOAST ==================
+  function showToast(msg, isError = false, isSuccess = false) {
+    const toast = document.getElementById('customToast');
+    toast.textContent = msg;
+    toast.className = '';
+    toast.classList.add('show');
+    if (isError) toast.classList.add('error');
+    if (isSuccess) toast.classList.add('success');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+
+  function copyText(text) {
+    navigator.clipboard.writeText(text)
+      .then(() => showToast(`✅ Đã copy: ${text}`, false, true))
+      .catch(() => showToast('⚠️ Không thể copy.', true));
+  }
+
+  // ================== ACC MỸ ==================
+  const accRef = firebase.database().ref('accUSA');
+  let accList = [];
+
+  accRef.on('value', snap => {
+    accList = snap.val() || [];
+    document.getElementById('accCount').textContent = `📊 ACC còn lại: ${accList.length}`;
+  });
+
+  document.getElementById('accAddBtn').addEventListener('click', () => {
+    const text = document.getElementById('accInput').value.trim();
+    if (!text) return showToast('⚠️ Chưa nhập ACC', true);
+    const lines = text.split(/[\n,;:|]+/).map(e => e.trim()).filter(e => e);
+    accRef.transaction(list => {
+      list = list || [];
+      lines.forEach(acc => { if (!list.includes(acc)) list.push(acc); });
+      return list;
+    }, () => showToast(`✅ Đã thêm ${lines.length} ACC`, false, true));
+    document.getElementById('accInput').value = '';
+  });
+
+  document.getElementById('accCopyBtnTop').addEventListener('click', () => {
+    if (accList.length === 0) return showToast('⚠️ Hết ACC Mỹ', true);
+    const acc = accList[0];
+    document.getElementById('accOutput').value = acc;
+    copyText(acc);
+  });
+
+  document.getElementById('accDeleteCurrentBtnTop').addEventListener('click', () => {
+    const currentAcc = document.getElementById('accOutput').value.trim();
+    if (!currentAcc) return showToast('⚠️ Không có ACC đang hiển thị', true);
+
+    const index = accList.indexOf(currentAcc);
+    if (index === -1) return showToast('⚠️ ACC này không còn trong danh sách', true);
+
+    accRef.transaction(list => {
+      if (!list) return [];
+      list.splice(index, 1);
+      return list;
+    }, (error) => {
+      if (error) showToast('⚠️ Lỗi khi xóa ACC', true);
+      else {
+        showToast(`🗑️ Đã xóa ACC: ${currentAcc}`, false, true);
+        document.getElementById('accOutput').value = '';
+      }
+    });
+  });
+
+  document.getElementById('accCopyManual').addEventListener('click', () => {
+    const acc = document.getElementById('accOutput').value;
+    if (!acc) return showToast('⚠️ Không có ACC để copy', true);
+    copyText(acc);
+  });
+
+  // ================== EMAIL ==================
+  const emailRef = firebase.database().ref('emails');
+  let emailList = [];
+
+  emailRef.on('value', snap => {
+    emailList = snap.val() || [];
+    document.getElementById('emailCount').textContent = emailList.length;
+  });
+
+  document.getElementById('emailAddBtn').addEventListener('click', () => {
+    const text = document.getElementById('emailInput').value.trim();
+    if (!text) return showToast('⚠️ Chưa nhập email', true);
+    const parts = text.split(/[\s,;|]+/).map(e => e.trim()).filter(e => e);
+    emailRef.transaction(list => {
+      list = list || [];
+      parts.forEach(e => { if (!list.includes(e)) list.push(e); });
+      return list;
+    }, () => showToast(`✅ Đã thêm ${parts.length} email`, false, true));
+    document.getElementById('emailInput').value = '';
+  });
+
+  document.getElementById('emailDeleteAllBtn').addEventListener('click', () => {
+    if (!confirm('Xóa toàn bộ email?')) return;
+    emailRef.set([]);
+    showToast('🗑️ Đã xóa toàn bộ email', false, true);
+  });
+
+  document.getElementById('emailCopyManual').addEventListener('click', () => {
+    const email = document.getElementById('emailOutput').value;
+    if (!email) return showToast('⚠️ Không có email để copy', true);
+    copyText(email);
+  });
+
+  document.getElementById('emailCopyBtn').addEventListener('click', () => {
+    if (emailList.length === 0) return showToast('⚠️ Hết email', true);
+    const index = Math.floor(Math.random() * emailList.length);
+    const email = emailList[index];
+    document.getElementById('emailOutput').value = email;
+    copyText(email);
+    emailRef.transaction(list => {
+      list.splice(index, 1);
+      return list;
+    });
+  });
+</script>
+</body>
+</html>
