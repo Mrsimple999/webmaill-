@@ -11,6 +11,7 @@
       --main-blue: #007bff;
       --main-green: #28a745;
       --main-red: #dc3545;
+      --main-gray: #6c757d;
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, sans-serif;
@@ -43,37 +44,42 @@
       box-sizing: border-box;
     }
 
-    /* Nút chính lấy ACC */
-    #accCopyBtnTop {
-      font-size: 18px;
-      padding: 14px;
-      background: var(--main-green);
-      color: white;
-      border: none;
+    /* Nhóm nút lấy acc */
+    .btn-group {
+      display: flex;
+      gap: 8px;
       width: 100%;
-      border-radius: 10px;
       margin-bottom: 8px;
     }
+    .btn-group button {
+      flex: 1;
+      padding: 14px;
+      font-size: 16px;
+      border-radius: 10px;
+      border: none;
+      color: white;
+      cursor: pointer;
+    }
 
-    /* Nhóm nút ngang */
-    .btn-group {
+    #accCopyBtnTop { background: var(--main-green); }
+    #accRandomBtnTop { background: var(--main-gray); }
+
+    /* Nút trong phần thêm/xóa */
+    .btn-group-small {
       display: flex;
       gap: 8px;
       margin-top: 6px;
       width: 100%;
     }
-    .btn-group button {
+    .btn-group-small button {
       flex: 1;
       padding: 12px;
       font-size: 14px;
       border-radius: 8px;
-    }
-
-    button {
-      background: var(--main-blue);
-      color: white;
       border: none;
+      color: white;
       cursor: pointer;
+      background: var(--main-blue);
     }
     .btn-red { background: var(--main-red); }
 
@@ -123,7 +129,6 @@
     #customToast.error { background-color: #d93025; }
     #customToast.success { background-color: #28a745; }
 
-    /* ✅ Nút lấy & copy email giữ nguyên kích thước cũ */
     #emailCopyBtn {
       font-size: 18px;
       padding: 14px;
@@ -139,7 +144,6 @@
       gap: 6px;
     }
 
-    /* ✅ Số lượng email nằm bên phải trong nút */
     #emailCopyBtn span {
       font-size: 14px;
       font-weight: bold;
@@ -150,13 +154,16 @@
 
 <div id="customToast"></div>
 
-<!-- ✅ Nút lấy ACC Mỹ -->
-<button id="accCopyBtnTop">📋 Lấy ACC Mỹ</button>
+<!-- ✅ Nhóm nút lấy / đổi ACC Mỹ -->
+<div class="btn-group">
+  <button id="accCopyBtnTop">📋 Lấy ACC Mỹ</button>
+  <button id="accRandomBtnTop">🔄 Đổi ACC Mỹ</button>
+</div>
 
 <!-- ================= ACC MỸ ================= -->
 <section>
   <textarea id="accInput" placeholder="Dán ACC Mỹ (ngăn cách bằng xuống dòng hoặc , ; :)"></textarea>
-  <div class="btn-group">
+  <div class="btn-group-small">
     <button id="accAddBtn">➕ Thêm ACC</button>
     <button id="accDeleteCurrentBtnTop" class="btn-red" title="Xóa ACC hiện tại">🗑️ Xóa ACC</button>
   </div>
@@ -170,7 +177,7 @@
 <!-- ================= EMAIL ================= -->
 <section>
   <textarea id="emailInput" placeholder="Dán email..."></textarea>
-  <div class="btn-group">
+  <div class="btn-group-small">
     <button id="emailAddBtn">➕ Thêm Email</button>
     <button id="emailDeleteAllBtn" class="btn-red" title="Xóa toàn bộ email">🗑️ Xóa Email</button>
   </div>
@@ -178,7 +185,6 @@
     <input type="text" id="emailOutput" placeholder="Email hiển thị..." readonly>
     <button id="emailCopyManual" title="Copy Email">📋</button>
   </div>
-  <!-- ✅ Nút lấy & copy nằm ngay dưới ô hiển thị email -->
   <button id="emailCopyBtn">📋 Lấy & Copy Email <span id="emailCount"></span></button>
 </section>
 
@@ -215,10 +221,12 @@
   // ================== ACC MỸ ==================
   const accRef = firebase.database().ref('accUSA');
   let accList = [];
+  let currentAccIndex = 0;
 
   accRef.on('value', snap => {
     accList = snap.val() || [];
     document.getElementById('accCount').textContent = `📊 ACC còn lại: ${accList.length}`;
+    if (currentAccIndex >= accList.length) currentAccIndex = 0;
   });
 
   document.getElementById('accAddBtn').addEventListener('click', () => {
@@ -233,9 +241,21 @@
     document.getElementById('accInput').value = '';
   });
 
+  // 📋 Lấy acc đầu tiên
   document.getElementById('accCopyBtnTop').addEventListener('click', () => {
     if (accList.length === 0) return showToast('⚠️ Hết ACC Mỹ', true);
-    const acc = accList[0];
+    currentAccIndex = 0;
+    const acc = accList[currentAccIndex];
+    document.getElementById('accOutput').value = acc;
+    copyText(acc);
+  });
+
+  // 🔄 Đổi acc theo thứ tự
+  document.getElementById('accRandomBtnTop').addEventListener('click', () => {
+    if (accList.length === 0) return showToast('⚠️ Hết ACC Mỹ', true);
+    currentAccIndex++;
+    if (currentAccIndex >= accList.length) currentAccIndex = 0;
+    const acc = accList[currentAccIndex];
     document.getElementById('accOutput').value = acc;
     copyText(acc);
   });
@@ -256,6 +276,7 @@
       else {
         showToast(`🗑️ Đã xóa ACC: ${currentAcc}`, false, true);
         document.getElementById('accOutput').value = '';
+        if (currentAccIndex >= accList.length - 1) currentAccIndex = 0;
       }
     });
   });
